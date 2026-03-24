@@ -1,20 +1,49 @@
 # BlackSwan AI
-> Work in progress
+> Adversarial stress-testing for trading strategies
 
-Adversarial stress-testing system for trading strategies using multi-agent reinforcement learning and LSTM-based market scenario generation.
+BlackSwan AI puts your trading strategy into a simulated battle against an AI adversary whose only job is to find and exploit its weaknesses. The result is a hardened version of your strategy that has been stress-tested against conditions it has never seen before.
+
+Built with reinforcement learning, adversarial game theory, and LSTM-based market scenario generation.
 
 ---
 
-## What It Does
+## Demo
 
-Most trading strategies are validated through backtesting on historical data. BlackSwan AI takes a different approach — it stress-tests your strategy against worst-case market conditions before you deploy it.
+> Live demo coming soon on Hugging Face Spaces
+
+![BlackSwan AI Screenshot](assets/screenshot.png)
+
+---
+
+## How It Works
 
 The system is a two-player adversarial game:
 
-- **Market Adversary** — an LSTM neural network that generates extreme market scenarios (flash crashes, volatility spikes, regime changes) designed to break your trading strategy
-- **Trading Agent** — a PPO reinforcement learning agent that learns to survive and adapt under adversarial conditions
+**Market Adversary** — an LSTM neural network that generates extreme market scenarios (flash crashes, volatility spikes, regime changes) designed to break your trading strategy. It gets smarter every round.
 
-Both agents train simultaneously in a minimax loop. The adversary finds weaknesses, the trading agent adapts. This co-evolution produces a strategy that is robust to conditions it has never seen before.
+**Trading Agent** — a PPO reinforcement learning agent that learns to survive and adapt under adversarial conditions. Its policy is shaped by the user's chosen strategy type.
+
+Both agents train simultaneously in a minimax loop. The adversary finds weaknesses, the trading agent adapts. After training, three portfolio curves are compared on the same price window:
+
+- **Baseline** — naive agent on clean prices (standard backtest)
+- **Attacked** — naive agent hit by adversarial event unprepared
+- **Hardened** — adversarially trained agent facing the same event
+
+---
+
+## Features
+
+- Dynamic portfolio builder — search any stock or asset by name or ticker, set share counts, live prices fetched automatically
+- Four strategy types with reward shaping — Momentum, Mean Reversion, Trend Following, Pure RL
+- Three risk profiles — Conservative, Moderate, Aggressive
+- Four adversarial scenario types — Flash Crash, Volatility Spike, Regime Change, Full Adversarial
+- Three training intensity levels — Light (8 rounds), Standard (20 rounds), Deep (40 rounds)
+- Live battle feed — round by round score tracker, adversary vs your strategy
+- Portfolio performance chart with adversarial event marker
+- Before vs after metrics — Sharpe ratio, max drawdown, return, volatility, Calmar ratio
+- AI analysis via Groq LLaMA 3.3 70B — training summary, failure mode explanation, strategy recommendation
+- Live Q&A — ask anything about your results in plain English
+- 2020 COVID crash test — validate against real held-out black swan data
 
 ---
 
@@ -22,17 +51,21 @@ Both agents train simultaneously in a minimax loop. The adversary finds weakness
 
 ```
 blackswan-ai/
+├── app.py                        # Streamlit UI entry point
+├── assets/
+│   └── style.css                 # custom dark theme CSS
 ├── src/
 │   ├── data/
-│   │   └── market_data.py        # yfinance data pipeline and feature engineering
+│   │   └── market_data.py        # yfinance data pipeline, feature engineering, ticker search
 │   ├── environment/
 │   │   └── trading_env.py        # custom Gymnasium trading environment
 │   ├── agents/
 │   │   └── adversary.py          # LSTM market adversary
 │   ├── training/
-│   │   └── trainer.py            # minimax training loop and curve generation
+│   │   └── trainer.py            # minimax training loop, intensity and risk presets
 │   └── utils/
-│       └── metrics.py            # Sharpe, drawdown, comparison table, failure modes
+│       ├── metrics.py            # Sharpe, drawdown, Calmar, comparison table, failure modes
+│       └── groq_summary.py       # Groq API integration for AI summaries and Q&A
 └── tests/
 ```
 
@@ -41,7 +74,7 @@ blackswan-ai/
 ## Setup
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/blackswan-ai.git
+git clone https://github.com/Daksh2179/blackswan-ai.git
 cd blackswan-ai
 
 python -m venv venv
@@ -50,52 +83,43 @@ source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
----
+Create a `.env` file in the root:
 
-## Running the Backend
-
-Each module has a sanity check you can run independently:
-
-```bash
-# test data pipeline
-python src/data/market_data.py
-
-# test trading environment
-python src/environment/trading_env.py
-
-# test market adversary
-python src/agents/adversary.py
-
-# run full minimax training and see metrics
-python src/utils/metrics.py
+```
+GROQ_API_KEY=your_groq_api_key_here
 ```
 
+Get a free Groq API key at [console.groq.com](https://console.groq.com).
+
 ---
 
-## Current Status
+## Run
 
-Backend implemented and working:
-
-- [x] Data pipeline with feature engineering (returns, volatility, RSI, SMA ratios, volume)
-- [x] Custom Gymnasium trading environment with adversarial price injection
-- [x] LSTM market adversary with four scenario types
-- [x] Minimax training loop with PPO trading agent
-- [x] Performance metrics and failure mode analysis
-- [ ] Shares-based portfolio input
-- [ ] Strategy reward shaping (Momentum, Mean Reversion, Trend Following)
-- [ ] Training intensity presets
-- [ ] Streamlit UI
-- [ ] COVID crash held-out test
+```bash
+streamlit run app.py
+```
 
 ---
 
 ## Tech Stack
 
-| Component | Library |
+| Component | Technology |
 |---|---|
-| RL Trading Agent | Stable-Baselines3 (PPO) |
+| RL Trading Agent | Stable-Baselines3 PPO |
 | Market Adversary | PyTorch LSTM |
-| Trading Environment | Gymnasium |
+| Trading Environment | Custom Gymnasium |
 | Data | yfinance + pandas |
-| UI (upcoming) | Streamlit + Plotly |
-| Backend API (upcoming) | FastAPI |
+| AI Summaries | Groq API — LLaMA 3.3 70B |
+| UI | Streamlit + Plotly |
+| Language | Python 3.12 |
+
+---
+
+## Roadmap
+
+- [ ] COVID crash test panel
+- [ ] Portfolio health score (0-100 resilience rating)
+- [ ] Strategy comparison mode
+- [ ] Adversary replay animation
+- [ ] Transaction costs in environment
+- [ ] Deploy to Hugging Face Spaces
