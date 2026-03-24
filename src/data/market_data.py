@@ -56,7 +56,83 @@ def _rsi(series: pd.Series, period: int = 14) -> pd.Series:
     return 100 - (100 / (1 + rs))
 
 
-# shares-based portfolio builder
+# ticker search — resolves company names to ticker symbols
+def search_ticker(query: str) -> tuple:
+    """
+    Resolve a company name or ticker symbol to a valid ticker.
+    Returns (ticker, company_name, price) or (None, None, None) if not found.
+    """
+    query = query.strip()
+    if not query:
+        return None, None, None
+
+    # common name to ticker mapping for popular assets
+    NAME_MAP = {
+        "apple": "AAPL", "microsoft": "MSFT", "google": "GOOGL",
+        "alphabet": "GOOGL", "amazon": "AMZN", "tesla": "TSLA",
+        "nvidia": "NVDA", "meta": "META", "facebook": "META",
+        "netflix": "NFLX", "spy": "SPY", "s&p": "SPY", "s&p 500": "SPY",
+        "bitcoin": "BTC-USD", "btc": "BTC-USD", "ethereum": "ETH-USD",
+        "eth": "ETH-USD", "gold": "GLD", "silver": "SLV",
+        "berkshire": "BRK-B", "jpmorgan": "JPM", "jp morgan": "JPM",
+        "goldman": "GS", "goldman sachs": "GS", "visa": "V",
+        "mastercard": "MA", "johnson": "JNJ", "walmart": "WMT",
+        "disney": "DIS", "nike": "NKE", "coca cola": "KO",
+        "cocacola": "KO", "pepsi": "PEP", "intel": "INTC",
+        "amd": "AMD", "advanced micro": "AMD", "qualcomm": "QCOM",
+        "palantir": "PLTR", "uber": "UBER", "airbnb": "ABNB",
+        "coinbase": "COIN", "robinhood": "HOOD", "snowflake": "SNOW",
+        "salesforce": "CRM", "oracle": "ORCL", "ibm": "IBM",
+        "tsmc": "TSM", "samsung": "005930.KS", "alibaba": "BABA",
+        "oil": "USO", "crude": "USO", "natural gas": "UNG",
+        "qqq": "QQQ", "nasdaq": "QQQ", "dow": "DIA",
+    }
+
+    lower = query.lower()
+
+    # check name map first
+    if lower in NAME_MAP:
+        ticker_sym = NAME_MAP[lower]
+        try:
+            t     = yf.Ticker(ticker_sym)
+            price = float(t.fast_info.last_price)
+            info  = t.info
+            name  = info.get("longName") or info.get("shortName") or ticker_sym
+            if price > 0:
+                return ticker_sym, name, price
+        except Exception:
+            pass
+
+    # try direct ticker lookup
+    try:
+        t     = yf.Ticker(query.upper())
+        price = float(t.fast_info.last_price)
+        if price > 1.0:
+            info = t.info
+            name = info.get("longName") or info.get("shortName") or query.upper()
+            return query.upper(), name, price
+    except Exception:
+        pass
+
+    # try yfinance Search if available
+    try:
+        results = yf.Search(query, max_results=5)
+        quotes  = results.quotes
+        if quotes:
+            best   = quotes[0]
+            symbol = best.get("symbol", "")
+            name   = best.get("longname") or best.get("shortname") or symbol
+            verify = yf.Ticker(symbol)
+            price  = float(verify.fast_info.last_price)
+            if price > 1.0:
+                return symbol, name, price
+    except Exception:
+        pass
+
+    return None, None, None
+
+
+# live price fetcher
 def get_current_prices(tickers: List[str]) -> Dict[str, float]:
     """
     Fetch the latest available closing price for each ticker.
@@ -68,7 +144,6 @@ def get_current_prices(tickers: List[str]) -> Dict[str, float]:
             data = yf.Ticker(ticker).fast_info
             prices[ticker] = float(data.last_price)
         except Exception:
-            # fallback: download last 5 days and take most recent close
             fallback = yf.download(ticker, period="5d", auto_adjust=True, progress=False)
             if not fallback.empty:
                 prices[ticker] = float(fallback["Close"].iloc[-1])
@@ -78,22 +153,12 @@ def get_current_prices(tickers: List[str]) -> Dict[str, float]:
     return prices
 
 
+# shares-based portfolio builder
 def shares_to_weights(
     shares: Dict[str, float],
     prices: Dict[str, float],
 ) -> Tuple[Dict[str, float], float, Dict[str, float]]:
-    """
-    Convert share counts to portfolio weights based on current prices.
-
-    Args:
-        shares : { ticker: number_of_shares }
-        prices : { ticker: current_price }
-
-    Returns:
-        weights         : { ticker: allocation_weight }  (sums to 1)
-        total_value     : total portfolio value in dollars
-        position_values : { ticker: dollar_value }
-    """
+    """Convert share counts to portfolio weights based on current prices."""
     position_values = {t: shares[t] * prices[t] for t in shares}
     total_value     = sum(position_values.values())
 
@@ -111,20 +176,10 @@ def build_portfolio_from_shares(
     """
     Full pipeline: takes user share counts, fetches live prices, computes weights,
     downloads historical data, and returns everything needed to initialize the trainer.
-
-    Args:
-        shares : { ticker: number_of_shares }  e.g. {"AAPL": 10, "SPY": 5}
-        split  : "train" or "covid"
-
-    Returns:
-        features_dict   : { ticker: feature_DataFrame }
-        weights         : normalized allocation weights
-        total_value     : total portfolio value in dollars (used as initial_capital)
     """
     tickers = list(shares.keys())
     start, end = (TRAIN_START, TRAIN_END) if split == "train" else (COVID_START, COVID_END)
 
-    # fetch live prices to compute weights and initial capital
     print("Fetching current prices...")
     prices = get_current_prices(tickers)
     for t, p in prices.items():
@@ -136,7 +191,6 @@ def build_portfolio_from_shares(
     for t in tickers:
         print(f"  {t}: {shares[t]} shares x ${prices[t]:,.2f} = ${position_values[t]:,.2f} ({weights[t]:.1%})")
 
-    # download historical data
     raw = download_data(tickers, start, end)
 
     features_dict = {}
@@ -167,16 +221,16 @@ def build_portfolio_data(
 
 # sanity check
 if __name__ == "__main__":
-    # simulate user entering share counts
-    shares = {
-        "AAPL": 10,
-        "SPY":  5,
-    }
+    print("=== Testing search_ticker ===")
+    for query in ["apple", "AAPL", "bitcoin", "nvidia", "gold"]:
+        ticker, name, price = search_ticker(query)
+        if ticker:
+            print(f"  '{query}' -> {ticker} ({name}) @ ${price:,.2f}")
+        else:
+            print(f"  '{query}' -> not found")
 
-    feats, weights, total_value = build_portfolio_from_shares(shares, split="train")
-
-    print(f"\nInitial capital : ${total_value:,.2f}")
-    print(f"Weights         : {weights}")
-    for ticker, df in feats.items():
-        print(f"\n{ticker}  shape={df.shape}")
-        print(df.tail(3))
+    print("\n=== Testing build_portfolio_from_shares ===")
+    shares = {"AAPL": 10, "SPY": 5}
+    feats, weights, total = build_portfolio_from_shares(shares, split="train")
+    print(f"Initial capital: ${total:,.2f}")
+    print(f"Weights: {weights}")

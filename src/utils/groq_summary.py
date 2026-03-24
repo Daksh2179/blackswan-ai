@@ -29,14 +29,15 @@ def generate_training_summary(
     scenario: str,
     history: Dict,
     curves: Dict,
+    initial_capital: float = 0.0,
 ) -> str:
-    """
-    Generate a plain English summary of the full training session.
-    Explains what happened, who won, and what it means for the user.
-    """
     b = curves["baseline_metrics"]
     a = curves["attacked_metrics"]
     h = curves["hardened_metrics"]
+
+    b_final = initial_capital * (1 + b['final_return_pct'] / 100) if initial_capital else 0
+    a_final = initial_capital * (1 + a['final_return_pct'] / 100) if initial_capital else 0
+    h_final = initial_capital * (1 + h['final_return_pct'] / 100) if initial_capital else 0
 
     worst_scenario = max(
         set(history["scenario_label"]),
@@ -46,22 +47,24 @@ def generate_training_summary(
     )
 
     prompt = f"""
-You are a financial AI assistant explaining the results of an adversarial trading strategy stress test.
-Write a clear, friendly summary for a non-technical user. Keep it to 4-5 sentences. No bullet points.
+You are a financial AI assistant explaining adversarial trading strategy stress test results.
+Write a punchy, clear summary for a non-technical user. 4-5 sentences. No bullet points.
+Sound like a smart analyst narrating a fight — honest, direct, slightly dramatic where appropriate.
 
-Here are the details:
-- Portfolio: {', '.join(tickers)}
-- Strategy: {strategy}
-- Risk profile: {risk_profile}
-- Stress scenario tested: {scenario}
-- Most dangerous scenario found: {worst_scenario}
+Portfolio: {', '.join(tickers)}
+Strategy: {strategy}
+Risk profile: {risk_profile}
+Stress scenario: {scenario}
+Most dangerous scenario found: {worst_scenario}
+Initial capital: ${initial_capital:,.2f}
 
-Results after adversarial training:
-- Baseline (no stress): {b['final_return_pct']:+.1f}% return, Sharpe {b['sharpe']:.2f}, max drawdown {b['max_drawdown']*100:.1f}%
-- Attacked (unprepared): {a['final_return_pct']:+.1f}% return, Sharpe {a['sharpe']:.2f}, max drawdown {a['max_drawdown']*100:.1f}%
-- Hardened (after training): {h['final_return_pct']:+.1f}% return, Sharpe {h['sharpe']:.2f}, max drawdown {h['max_drawdown']*100:.1f}%
+Results:
+- Baseline (no stress): {b['final_return_pct']:+.1f}% return → ${b_final:,.2f}, Sharpe {b['sharpe']:.2f}, max drawdown {b['max_drawdown']*100:.1f}%
+- Attacked (unprepared): {a['final_return_pct']:+.1f}% return → ${a_final:,.2f}, Sharpe {a['sharpe']:.2f}, max drawdown {a['max_drawdown']*100:.1f}%
+- Hardened (after training): {h['final_return_pct']:+.1f}% return → ${h_final:,.2f}, Sharpe {h['sharpe']:.2f}, max drawdown {h['max_drawdown']*100:.1f}%
 
-Explain what happened in plain English. Mention whether the adversarial training helped and what the biggest risk to this strategy is.
+Mention the actual dollar amounts. Explain what happened in plain English. Be direct about whether adversarial training helped.
+Only reference the exact numbers above, do not invent figures.
 """
     return _call_groq(prompt)
 
@@ -133,25 +136,27 @@ def generate_qa_response(
     history: Dict,
     curves: Dict,
     failure_modes: List[Dict],
+    initial_capital: float = 0.0,
 ) -> str:
-    """
-    Answer a user's specific question about their stress test results.
-    Used for the live Q&A panel in the UI.
-    """
     b = curves["baseline_metrics"]
     a = curves["attacked_metrics"]
     h = curves["hardened_metrics"]
 
+    b_final = initial_capital * (1 + b['final_return_pct'] / 100) if initial_capital else 0
+    a_final = initial_capital * (1 + a['final_return_pct'] / 100) if initial_capital else 0
+    h_final = initial_capital * (1 + h['final_return_pct'] / 100) if initial_capital else 0
+
     context = f"""
 Portfolio: {', '.join(tickers)}
 Strategy: {strategy}
+Initial capital: ${initial_capital:,.2f}
 Training rounds: {len(history['round'])}
 Scenarios tested: {', '.join(set(history['scenario_label']))}
 
 Results:
-- Baseline: {b['final_return_pct']:+.1f}% return, Sharpe {b['sharpe']:.2f}, max drawdown {b['max_drawdown']*100:.1f}%
-- Attacked: {a['final_return_pct']:+.1f}% return, Sharpe {a['sharpe']:.2f}, max drawdown {a['max_drawdown']*100:.1f}%
-- Hardened: {h['final_return_pct']:+.1f}% return, Sharpe {h['sharpe']:.2f}, max drawdown {h['max_drawdown']*100:.1f}%
+- Baseline (no attack): {b['final_return_pct']:+.1f}% → ${b_final:,.2f}, Sharpe {b['sharpe']:.2f}, max drawdown {b['max_drawdown']*100:.1f}%
+- Attacked (unprepared): {a['final_return_pct']:+.1f}% → ${a_final:,.2f}, Sharpe {a['sharpe']:.2f}, max drawdown {a['max_drawdown']*100:.1f}%
+- Hardened (trained): {h['final_return_pct']:+.1f}% → ${h_final:,.2f}, Sharpe {h['sharpe']:.2f}, max drawdown {h['max_drawdown']*100:.1f}%
 
 Top failure modes:
 {chr(10).join(f"- {m['scenario']}: avg drawdown {m['avg_drawdown_pct']:.1f}%" for m in failure_modes[:3])}
@@ -159,13 +164,13 @@ Top failure modes:
 
     prompt = f"""
 You are a financial AI assistant. Answer the following question about a trading strategy stress test.
-Be concise, clear, and friendly. Use plain English. 2-3 sentences max.
+Be concise, clear, and direct. Use plain English and actual dollar amounts where relevant. 2-3 sentences max.
+Only reference the exact numbers provided in the context, do not invent figures.
 
-Context about the stress test:
+Context:
 {context}
 
 User question: {question}
-Important: only reference the exact numbers provided in the context above, do not invent or estimate any figures.
 """
     return _call_groq(prompt, max_tokens=200)
 
