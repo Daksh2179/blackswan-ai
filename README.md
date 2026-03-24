@@ -10,8 +10,11 @@ Built with reinforcement learning, adversarial game theory, and LSTM-based marke
 ## Demo
 
 > Live demo coming soon on Hugging Face Spaces
+<img width="1919" height="827" alt="Screenshot 2026-03-23 233953" src="https://github.com/user-attachments/assets/e3495c42-893e-4151-bf14-369cff5e9d85" />
+<img width="1919" height="824" alt="Screenshot 2026-03-23 234046" src="https://github.com/user-attachments/assets/25bdb45c-a6b4-4884-8df4-79fe517160b2" />
 
-![BlackSwan AI Screenshot](assets/screenshot.png)
+
+
 
 ---
 
