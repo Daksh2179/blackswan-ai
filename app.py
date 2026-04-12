@@ -101,16 +101,18 @@ def render_setup():
             st.session_state.portfolio = {}  # { ticker: shares }
 
         # add asset row
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            new_query = st.text_input(
-                "Search",
-                placeholder = "e.g. Apple, NVDA, Bitcoin, Gold...",
-                label_visibility = "collapsed",
-                key = "ticker_input",
-            ).strip()
-        with col2:
-            add_clicked = st.button("+ Add Asset", use_container_width=True)
+        # add asset form — Enter key or button both submit
+        with st.form("add_asset_form", clear_on_submit=True):
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                new_query = st.text_input(
+                    "Search",
+                    placeholder = "e.g. Apple, NVDA, Bitcoin, Gold...",
+                    label_visibility = "collapsed",
+                    key = "ticker_input",
+                ).strip()
+            with col2:
+                add_clicked = st.form_submit_button("+ Add Asset", use_container_width=True)
 
         if add_clicked and new_query:
             with st.spinner(f"Searching for '{new_query}'..."):
@@ -163,7 +165,7 @@ def render_setup():
                     if n > 0:
                         st.markdown(f"<div style='color:#00ff88;font-size:0.85rem'>${val:,.2f}</div>", unsafe_allow_html=True)
                 with c4:
-                    if st.button("✕", key=f"remove_{ticker}", use_container_width=True):
+                    if st.button("✕", key=f"remove_{ticker}", use_container_width=True, type="primary"):
                         to_remove.append(ticker)
 
             for t in to_remove:
@@ -375,7 +377,8 @@ def render_battle():
         dd     = info["drawdown"] * 100
         css    = "round-win" if outcome == "win" else "round-loss"
         icon   = "✅" if outcome == "win" else "⚠️"
-        line   = f'<div class="{css}">{icon} Round {round_idx}/{total} [{label}] &nbsp;|&nbsp; Return: {pnl:+.1f}% &nbsp;|&nbsp; Max DD: {dd:.1f}%</div>'
+        scenario_label = info["scenario"].replace("_", " ").title()
+        line   = f'<div class="{css}">{icon} Round {round_idx}/{total} [{scenario_label}] &nbsp;|&nbsp; Return: {pnl:+.1f}% &nbsp;|&nbsp; Max DD: {dd:.1f}%</div>'
         feed_lines.append(line)
         feed_ph.markdown("".join(feed_lines), unsafe_allow_html=True)
 
@@ -440,15 +443,17 @@ def render_results():
     if survived:
         st.markdown(f"""
         <div class="verdict-survived">
-            <div class="verdict-title">✅ Strategy Survived</div>
-            <div class="verdict-subtitle">Adversarial training improved resilience — hardened agent outperformed the unprepared strategy under the same attack</div>
+            <div class="verdict-icon">✅</div>
+            <div class="verdict-title">Strategy Survived</div>
+            <div class="verdict-subtitle">Adversarial training improved resilience — the hardened agent outperformed the unprepared strategy under the same attack</div>
         </div>
         """, unsafe_allow_html=True)
     else:
         st.markdown(f"""
         <div class="verdict-failed">
-            <div class="verdict-title">⚠️ Adversary Wins</div>
-            <div class="verdict-subtitle">The strategy needs more training or a different risk profile to withstand these conditions</div>
+            <div class="verdict-icon">⚠️</div>
+            <div class="verdict-title">Adversary Wins</div>
+            <div class="verdict-subtitle">The strategy needs more training rounds or a different risk profile to withstand these conditions</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -533,50 +538,61 @@ def render_results():
 
     st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
 
-    # metrics comparison
-    st.markdown("### How Did Hardening Help?")
-    metrics_map = [
-        ("Total Return",         f"{a['final_return_pct']:+.1f}%", f"{h['final_return_pct']:+.1f}%",
-         h["final_return_pct"] > a["final_return_pct"]),
-        ("Sharpe Ratio",         f"{a['sharpe']:+.3f}",            f"{h['sharpe']:+.3f}",
-         h["sharpe"] > a["sharpe"]),
-        ("Max Drawdown",         f"{a['max_drawdown']*100:.1f}%",  f"{h['max_drawdown']*100:.1f}%",
-         h["max_drawdown"] < a["max_drawdown"]),
-        ("Annualised Volatility",f"{a.get('volatility_ann', 0):.1f}%", f"{h.get('volatility_ann', 0):.1f}%",
-         h.get("volatility_ann", 0) < a.get("volatility_ann", 0)),
-    ]
+    # two column layout — metrics left, failure modes right
+    col_left, col_right = st.columns([1, 1], gap="large")
 
-    for name, att_val, hard_val, improved in metrics_map:
-        icon = "✅" if improved else "⚠️"
-        tag_cls = "metric-improved" if improved else "metric-worse"
-        tag_txt = "improved" if improved else "worse"
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-name">{name}</div>
-            <div class="metric-values">
-                <span class="metric-attacked">{att_val}</span>
-                <span class="metric-arrow">→</span>
-                <span class="metric-hardened">{hard_val}</span>
-                <span class="{tag_cls}">{icon} {tag_txt}</span>
-            </div>
+    with col_left:
+        st.markdown("""
+        <div class="section-header">
+            <div class="section-header-bar"></div>
+            <div class="section-header-text">How Did Hardening Help?</div>
         </div>
         """, unsafe_allow_html=True)
 
-    st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+        metrics_map = [
+            ("Total Return",          f"{a['final_return_pct']:+.1f}%", f"{h['final_return_pct']:+.1f}%",
+             h["final_return_pct"] > a["final_return_pct"]),
+            ("Sharpe Ratio",          f"{a['sharpe']:+.3f}",            f"{h['sharpe']:+.3f}",
+             h["sharpe"] > a["sharpe"]),
+            ("Max Drawdown",          f"{a['max_drawdown']*100:.1f}%",  f"{h['max_drawdown']*100:.1f}%",
+             h["max_drawdown"] < a["max_drawdown"]),
+        ]
 
-    # failure modes
-    with st.expander("⚠️ View Failure Mode Analysis", expanded=False):
-        for m in failure_modes:
-            color = "#ff4444" if m["threat_level"] == "HIGH" else "#ffaa00" if m["threat_level"] == "MEDIUM" else "#00ff88"
+        for name, att_val, hard_val, improved in metrics_map:
+            icon    = "↑ improved" if improved else "↓ worse"
+            tag_cls = "metric-improved" if improved else "metric-worse"
             st.markdown(f"""
             <div class="metric-card">
-                <div class="metric-name">{m['scenario'].replace('_', ' ').title()} &nbsp;
-                    <span style='color:{color};font-weight:700'>{m['threat_level']}</span>
+                <div class="metric-name">{name}</div>
+                <div class="metric-values">
+                    <span class="metric-attacked">{att_val}</span>
+                    <span class="metric-arrow">→</span>
+                    <span class="metric-hardened">{hard_val}</span>
+                    <span class="{tag_cls}">{icon}</span>
                 </div>
-                <div style='color:#aaa;font-size:0.9rem'>
-                    Avg drawdown: <b style='color:#ff4444'>{m['avg_drawdown_pct']:.1f}%</b> &nbsp;|&nbsp;
-                    Worst: <b style='color:#ff4444'>{m['worst_drawdown_pct']:.1f}%</b> &nbsp;|&nbsp;
-                    Rounds tested: {m['n_rounds']}
+            </div>
+            """, unsafe_allow_html=True)
+
+    with col_right:
+        st.markdown("""
+        <div class="section-header">
+            <div class="section-header-bar"></div>
+            <div class="section-header-text">Failure Mode Analysis</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        for m in failure_modes:
+            threat_cls = f"threat-{m['threat_level'].lower()}"
+            st.markdown(f"""
+            <div class="failure-card">
+                <div class="failure-card-header">
+                    <div class="failure-scenario">{m['scenario'].replace('_', ' ').title()}</div>
+                    <span class="{threat_cls}">{m['threat_level']}</span>
+                </div>
+                <div class="failure-stats">
+                    Avg drawdown <span>{m['avg_drawdown_pct']:.1f}%</span> &nbsp;·&nbsp;
+                    Worst <span>{m['worst_drawdown_pct']:.1f}%</span> &nbsp;·&nbsp;
+                    {m['n_rounds']} rounds
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -632,9 +648,83 @@ def render_results():
         </div>
         """, unsafe_allow_html=True)
 
-    st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+    # COVID crash test panel
+    if st.session_state.covid_test:
+        st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+        st.markdown("### 🦠 2020 COVID Crash Validation")
+        st.markdown("<p style='color:#6b7280'>Testing your hardened strategy against the real 2020 COVID crash — data it never saw during training.</p>", unsafe_allow_html=True)
 
-    # run again button
+        with st.spinner("Running COVID crash test..."):
+            from src.utils.metrics import run_covid_test
+            covid = run_covid_test(trainer)
+
+        if "error" in covid:
+            st.error(covid["error"])
+        else:
+            n = covid["naive_metrics"]
+            h = covid["hardened_metrics"]
+
+            # covid verdict
+            covid_survived = h["final_return_pct"] > n["final_return_pct"] or h["max_drawdown"] < n["max_drawdown"]
+            if covid_survived:
+                st.markdown(f"""
+                <div class="verdict-survived" style="padding:1.5rem">
+                    <div class="verdict-title" style="font-size:1.4rem">✅ Hardened Strategy Survived COVID</div>
+                    <div class="verdict-subtitle">The adversarially trained agent outperformed the naive strategy on real 2020 crash data it never saw during training</div>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown(f"""
+                <div class="verdict-failed" style="padding:1.5rem">
+                    <div class="verdict-title" style="font-size:1.4rem">⚠️ COVID Crash Was Too Severe</div>
+                    <div class="verdict-subtitle">Even the hardened strategy struggled against the real 2020 crash — consider deeper training or a more conservative risk profile</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            # covid chart
+            fig_covid = go.Figure()
+            x = list(range(len(covid["naive"])))
+            fig_covid.add_trace(go.Scatter(
+                x=x, y=covid["naive"],
+                name="Naive (unprepared)",
+                line=dict(color="#ef4444", width=2),
+            ))
+            fig_covid.add_trace(go.Scatter(
+                x=x, y=covid["hardened"],
+                name="Hardened (trained)",
+                line=dict(color="#10b981", width=2),
+            ))
+            fig_covid.update_layout(
+                paper_bgcolor = "#0a0e1a",
+                plot_bgcolor  = "#0a0e1a",
+                font          = dict(color="#f1f5f9"),
+                legend        = dict(bgcolor="#0f1520", bordercolor="#1e2433", borderwidth=1),
+                xaxis         = dict(title="Trading Days (Jan–Dec 2020)", gridcolor="#1e2433", color="#64748b"),
+                yaxis         = dict(title="Portfolio Value ($)", gridcolor="#1e2433", color="#64748b"),
+                margin        = dict(l=20, r=20, t=20, b=20),
+                height        = 350,
+                title         = dict(text="COVID Crash Period — Jan to Dec 2020", font=dict(color="#94a3b8", size=12)),
+            )
+            st.plotly_chart(fig_covid, use_container_width=True)
+
+            # covid metrics
+            c1, c2 = st.columns(2)
+            with c1:
+                st.markdown(f"""
+                <div class="dollar-card">
+                    <div class="dc-label">Naive Strategy (COVID)</div>
+                    <div class="dc-amount" style="color:#ef4444">{n['final_return_pct']:+.1f}%</div>
+                    <div class="dc-change" style="color:#ef4444">Max drawdown: {n['max_drawdown']*100:.1f}% | Sharpe: {n['sharpe']:+.2f}</div>
+                </div>
+                """, unsafe_allow_html=True)
+            with c2:
+                st.markdown(f"""
+                <div class="dollar-card">
+                    <div class="dc-label">Hardened Strategy (COVID)</div>
+                    <div class="dc-amount" style="color:#10b981">{h['final_return_pct']:+.1f}%</div>
+                    <div class="dc-change" style="color:#10b981">Max drawdown: {h['max_drawdown']*100:.1f}% | Sharpe: {h['sharpe']:+.2f}</div>
+                </div>
+                """, unsafe_allow_html=True)
     if st.button("🔄 Run New Battle"):
         for key in ["screen", "setup_step", "trainer", "history", "curves",
                     "failure_modes", "groq_summary", "groq_failure", "groq_rec"]:

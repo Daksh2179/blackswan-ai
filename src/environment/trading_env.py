@@ -190,7 +190,12 @@ class TradingEnvironment(gym.Env):
         new_weights   = self._apply_action(action)
         asset_returns = self._get_returns()
 
+        # transaction cost — 0.1% on portfolio turnover
+        turnover       = float(np.sum(np.abs(new_weights - self.prev_weights)))
+        tx_cost        = turnover * 0.001
+
         port_return        = float(np.dot(new_weights, asset_returns))
+        port_return       -= tx_cost  # deduct transaction cost from return
         self.portfolio_val *= (1 + port_return)
         self.peak_val       = max(self.peak_val, self.portfolio_val)
         drawdown            = (self.peak_val - self.portfolio_val) / (self.peak_val + 1e-9)

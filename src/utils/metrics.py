@@ -173,7 +173,91 @@ def identify_failure_modes(
     return failure_modes
 
 
-# sanity check
+def run_covid_test(trainer) -> Dict:
+    """
+    Run the hardened agent against the held-out 2020 COVID crash data.
+    Returns metrics and portfolio history for both naive and hardened agents.
+    """
+    import sys, os
+    sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
+    from src.data.market_data import build_portfolio_data, get_current_prices
+    from src.environment.trading_env import TradingEnvironment
+    from stable_baselines3 import PPO
+
+    tickers = trainer.tickers
+
+    # download COVID period data
+    print("Downloading COVID crash data (2020)...")
+    from src.data.market_data import build_portfolio_from_shares
+    import yfinance as yf
+    import pandas as pd
+
+    # use weight-based builder for COVID period
+    from src.data.market_data import build_portfolio_data, TRAIN_START, TRAIN_END, COVID_START, COVID_END, download_data, compute_features
+
+    raw = download_data(tickers, COVID_START, COVID_END)
+    covid_features = {}
+    for t in tickers:
+        try:
+            covid_features[t] = compute_features(raw, t)
+        except Exception:
+            pass
+
+    if not covid_features:
+        return {"error": "Could not download COVID data for these tickers"}
+
+    # align tickers that have data
+    valid_tickers = list(covid_features.keys())
+    covid_weights = {t: trainer.weights[t] for t in valid_tickers if t in trainer.weights}
+    total = sum(covid_weights.values())
+    covid_weights = {t: w / total for t, w in covid_weights.items()}
+
+    def run_agent(agent, env):
+        obs, _ = env.reset()
+        vals = [trainer.initial_capital]
+        done = False
+        while not done:
+            action, _ = agent.predict(obs, deterministic=True)
+            obs, _, terminated, truncated, info = env.step(action)
+            vals.append(info["portfolio_value"])
+            done = terminated or truncated
+        return vals
+
+    # hardened agent on COVID data
+    hardened_env = TradingEnvironment(
+        features_dict    = covid_features,
+        weights          = covid_weights,
+        initial_capital  = trainer.initial_capital,
+        max_drawdown_tol = trainer.max_drawdown_tol,
+        position_sizing  = trainer.position_sizing,
+        trading_horizon  = trainer.trading_horizon,
+        episode_len      = min(120, len(list(covid_features.values())[0])),
+        strategy         = trainer.strategy,
+    )
+    hardened_vals = run_agent(trainer.agent, hardened_env)
+
+    # naive agent on COVID data
+    naive_env = TradingEnvironment(
+        features_dict    = covid_features,
+        weights          = covid_weights,
+        initial_capital  = trainer.initial_capital,
+        max_drawdown_tol = trainer.max_drawdown_tol,
+        position_sizing  = trainer.position_sizing,
+        trading_horizon  = trainer.trading_horizon,
+        episode_len      = min(120, len(list(covid_features.values())[0])),
+        strategy         = trainer.strategy,
+    )
+    naive_agent = PPO("MlpPolicy", naive_env, verbose=0)
+    naive_vals  = run_agent(naive_agent, naive_env)
+
+    return {
+        "naive":            naive_vals,
+        "hardened":         hardened_vals,
+        "naive_metrics":    compute_metrics(naive_vals),
+        "hardened_metrics": compute_metrics(hardened_vals),
+        "period":           f"{COVID_START} to {COVID_END}",
+        "tickers":          valid_tickers,
+    }
 if __name__ == "__main__":
     import sys, os
     sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))

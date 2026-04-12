@@ -48,8 +48,9 @@ def generate_training_summary(
 
     prompt = f"""
 You are a financial AI assistant explaining adversarial trading strategy stress test results.
-Write a punchy, clear summary for a non-technical user. 4-5 sentences. No bullet points.
-Sound like a smart analyst narrating a fight — honest, direct, slightly dramatic where appropriate.
+Write a punchy, direct summary in exactly 3-4 sentences. No bullet points. No lengthy explanations.
+Sound like a sharp analyst — honest, direct, slightly dramatic where it fits.
+Lead with what happened, then what the numbers show, then one takeaway.
 
 Portfolio: {', '.join(tickers)}
 Strategy: {strategy}
@@ -84,9 +85,8 @@ def generate_failure_mode_explanation(
     )
 
     prompt = f"""
-You are a financial AI assistant. Explain in 3-4 plain English sentences why the following market scenarios
-are dangerous for a {strategy} trading strategy. Be specific about why this strategy type struggles
-in these conditions. No bullet points, no technical jargon.
+You are a financial AI assistant. Explain in exactly 3 plain English sentences why the following market scenarios
+are dangerous for a {strategy} trading strategy. Be specific. No bullet points, no jargon.
 
 Top threats identified:
 {threats}
@@ -113,7 +113,7 @@ def generate_strategy_recommendation(
 
     prompt = f"""
 You are a financial AI assistant giving practical advice after a stress test.
-Write 3-4 sentences of actionable advice for a trader using a {strategy} strategy with a {risk_profile} risk profile.
+Write exactly 3 sentences of actionable advice for a trader using a {strategy} strategy with a {risk_profile} risk profile.
 
 Stress test results:
 - Biggest threat to this strategy: {top_threat}
