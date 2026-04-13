@@ -7,14 +7,10 @@ Built with reinforcement learning, adversarial game theory, and LSTM-based marke
 
 ---
 
-## Demo
+## Screenshots
 
-> Live demo coming soon on Hugging Face Spaces
-<img width="1919" height="827" alt="Screenshot 2026-03-23 233953" src="https://github.com/user-attachments/assets/e3495c42-893e-4151-bf14-369cff5e9d85" />
-<img width="1919" height="824" alt="Screenshot 2026-03-23 234046" src="https://github.com/user-attachments/assets/25bdb45c-a6b4-4884-8df4-79fe517160b2" />
-
-
-
+<img width="1919" height="827" alt="Battle Screen" src="https://github.com/user-attachments/assets/e3495c42-893e-4151-bf14-369cff5e9d85" />
+<img width="1919" height="824" alt="Results" src="https://github.com/user-attachments/assets/25bdb45c-a6b4-4884-8df4-79fe517160b2" />
 
 ---
 
@@ -44,13 +40,10 @@ Both agents train simultaneously in a minimax loop. The adversary finds weakness
 - Live battle feed — round by round score tracker, adversary vs your strategy
 - Portfolio performance chart with adversarial event marker
 - Before vs after metrics — Sharpe ratio, max drawdown, return, volatility, Calmar ratio
+- Transaction costs — 0.1% turnover fee applied at each rebalancing step
 - AI analysis via Groq LLaMA 3.3 70B — training summary, failure mode explanation, strategy recommendation
 - Live Q&A — ask anything about your results in plain English
-- 2020 COVID crash test — validate against real held-out black swan data
-
----
-
-## Project Structure
+- 2020 COVID crash validation — test against real held-out black swan data the system never saw during training
 
 ```
 blackswan-ai/
@@ -72,8 +65,6 @@ blackswan-ai/
 └── tests/
 ```
 
----
-
 ## Setup
 
 ```bash
@@ -86,13 +77,10 @@ source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-Create a `.env` file in the root:
-
-```
+Create a `.env` file in the root with your Groq API key:
 GROQ_API_KEY=your_groq_api_key_here
-```
 
-Get a free Groq API key at [console.groq.com](https://console.groq.com).
+Get a free Groq API key at [console.groq.com](https://console.groq.com). No credit card required.
 
 ---
 
@@ -101,6 +89,17 @@ Get a free Groq API key at [console.groq.com](https://console.groq.com).
 ```bash
 streamlit run app.py
 ```
+
+The app will open at `http://localhost:8501`.
+
+**How to use:**
+1. Build your portfolio — search any stock or asset by name or ticker, enter share counts
+2. Choose your trading strategy — Momentum, Mean Reversion, Trend Following, or Pure RL
+3. Set your risk profile and stress scenario
+4. Choose training intensity and optionally enable the 2020 COVID crash validation
+5. Hit Start Battle and watch the adversarial training unfold live
+6. Review results — portfolio curves, metrics comparison, failure modes, and AI analysis
+7. Ask questions about your results in plain English using the Q&A panel
 
 ---
 
@@ -115,14 +114,3 @@ streamlit run app.py
 | AI Summaries | Groq API — LLaMA 3.3 70B |
 | UI | Streamlit + Plotly |
 | Language | Python 3.12 |
-
----
-
-## Roadmap
-
-- [ ] COVID crash test panel
-- [ ] Portfolio health score (0-100 resilience rating)
-- [ ] Strategy comparison mode
-- [ ] Adversary replay animation
-- [ ] Transaction costs in environment
-- [ ] Deploy to Hugging Face Spaces
